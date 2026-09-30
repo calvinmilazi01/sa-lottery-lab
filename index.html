@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="description" content="Probability lab for the South African National Lottery, with nightly official results and daily forecast picks.">
+<meta name="theme-color" content="#0C7563">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SA Lottery Probability Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E8EEEA; --surface:#F6F9F7; --sunk:#DCE5E0; --ink:#15252A; --muted:#566A6F; --line:#C3D2CB;
+  --ball:#F2B705; --teal:#0C7563; --hot:#C23B28; --cold:#2B67B0; --ok:#0C7563; --warn:#B25A00;
+  --radius-s:6px; --radius-l:14px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E181B; --surface:#15232738; --surface:#162428; --sunk:#1D2F34; --ink:#E3EDE9; --muted:#8FA4A1; --line:#29404580;
+    --line:#2A4046; --ball:#F2B705; --teal:#3DB69C; --hot:#E86A52; --cold:#6AA2E8; --ok:#3DB69C; --warn:#E39A3B;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E181B; --surface:#162428; --sunk:#1D2F34; --ink:#E3EDE9; --muted:#8FA4A1;
+  --line:#2A4046; --ball:#F2B705; --teal:#3DB69C; --hot:#E86A52; --cold:#6AA2E8; --ok:#3DB69C; --warn:#E39A3B;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 "Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:"Bricolage Grotesque","Public Sans",system-ui,sans-serif;line-height:1.1;margin:0}
+p{margin:0 0 .8em}
+a{color:var(--teal)}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 20px 60px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
+
+/* Hero */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:36px;align-items:start;padding-bottom:28px;border-bottom:2px solid var(--ink)}
+.hero h1{font-size:clamp(34px,5.2vw,62px);font-weight:800;letter-spacing:-.02em}
+.hero h1 .odds{display:block;font-size:.62em;font-weight:700;margin-top:.25em}
+.lede{font-size:18px;max-width:34em;margin-top:18px;color:var(--muted)}
+.meta{font-size:14px;color:var(--muted);margin-top:16px}
+.drum{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-l);padding:16px}
+.drum-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+.drum-head h2{font-size:18px}
+.legend{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.legend .bar{width:110px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--cold),var(--sunk),var(--hot))}
+.grid52{display:grid;grid-template-columns:repeat(var(--cols,13),1fr);gap:6px}
+.b{aspect-ratio:1;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-weight:600;font-size:14px;padding:0;background:var(--sunk);transition:transform .12s}
+.b:hover{transform:scale(1.08)}
+.b[aria-pressed="true"]{outline:3px solid var(--ink);outline-offset:1px}
+.detail{margin-top:14px;min-height:64px;font-size:14px;background:var(--sunk);border-radius:var(--radius-s);padding:10px 12px}
+.detail strong{font-size:15px}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin:28px 0 22px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ball)}
+.panel{display:none}
+.panel.on{display:block}
+.panel h2{font-size:28px;margin-bottom:10px}
+.panel h3{font-size:19px;margin:26px 0 8px}
+.intro{max-width:44em;color:var(--muted)}
+
+.controls{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:end;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:14px;margin:14px 0}
+.controls label{display:flex;flex-direction:column;font-size:13px;color:var(--muted);gap:4px}
+.controls input,.controls select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0;width:150px}
+.btn{background:var(--ink);color:var(--bg);border:0;border-radius:999px;padding:9px 18px;font-weight:600}
+.btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+.scroll{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--muted);font-size:13px}
+.good{color:var(--ok);font-weight:600}
+.flag{color:var(--warn);font-weight:600}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:12px 0}
+.stat{background:var(--surface);border-left:4px solid var(--teal);padding:10px 14px;border-radius:0 var(--radius-s) var(--radius-s) 0}
+.stat .v{font-family:"Bricolage Grotesque",sans-serif;font-size:26px;font-weight:700}
+.stat .l{font-size:13px;color:var(--muted)}
+.note{font-size:14px;background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius-s);padding:10px 14px;max-width:52em}
+svg text{fill:var(--muted);font-family:"Public Sans",sans-serif}
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:10px}
+.balls{display:flex;gap:6px;flex-wrap:wrap}
+.mini{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--ball);color:#1b1b1b;font-weight:700;font-size:14px}
+.mini.bo{background:var(--sunk);color:var(--ink);border:1px solid var(--line)}
+.ticket{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.ticket small{color:var(--muted)}
+textarea{width:100%;min-height:130px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;font-size:13px}
+.msg{font-size:14px;margin-top:8px}
+@media (max-width:820px){
+  .hero{grid-template-columns:1fr;gap:22px}
+  .grid52{grid-template-columns:repeat(8,1fr)}
+  .games{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){.b{transition:none}}
+
+.games{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-bottom:26px}
+.game{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--radius-s);padding:9px 11px;font-weight:600}
+.game small{font-weight:400;font-size:12px;color:var(--muted)}
+.game[aria-checked="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.game[aria-checked="true"] small{color:var(--bg);opacity:.75}
+.subnav{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0}
+.sub,.setb{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:600;font-size:14px}
+.sub[aria-selected="true"],.setb[aria-pressed="true"]{background:var(--ball);border-color:var(--ball);color:#1b1b1b}
+.mini.hot{background:var(--hot);color:#fff}.mini.cold{background:var(--cold);color:#fff}
+.muted{color:var(--muted)}
+.pz{width:110px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 7px;text-align:right}
+.fc input[type=range]{width:150px;accent-color:var(--teal)}
+.fc output{font-size:13px;color:var(--ink)}
+.rank{width:26px;font-weight:700;align-self:center;color:var(--muted)}
+.about{font-size:14px;color:var(--muted);margin-top:8px;max-width:36em}
+/* Daily picks */
+.picks{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-l);padding:16px 18px}
+.picks-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.picks-head h2{font-size:22px}
+.picks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:4px 22px}
+.picks .ticket{border-bottom:0;padding:8px 0}
+.picks .gname{font-weight:600;min-width:100%}
+.picks .gname small{font-weight:400;color:var(--muted);margin-left:6px}
+.picks .prev{font-size:13px;color:var(--muted);margin:8px 0 0;border-top:1px solid var(--line);padding-top:8px}
+@media (max-width:820px){.games{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:560px) and (max-width:820px){.games{grid-template-columns:repeat(4,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="games" id="games" role="radiogroup" aria-label="Choose a game"></nav>
+
+<header class="hero">
+  <div>
+    <h1>Every <span id="h1game">Lotto</span> ticket has the same chance.<span class="odds" id="h1odds"></span></h1>
+    <p class="lede">This lab tests that claim with real draw results. It measures how random the results look, shows hot and cold numbers in context, runs prediction strategies against a random pick, and works out what a ticket is worth.</p>
+    <p class="meta" id="meta"></p>
+    <p class="about" id="about"></p>
+  </div>
+  <section class="drum" aria-labelledby="drumTitle">
+    <div class="drum-head">
+      <h2 id="drumTitle">How often each ball came out</h2>
+      <div class="legend"><span>Less</span><span class="bar"></span><span>More than expected</span></div>
+    </div>
+    <div class="grid52" id="grid52"></div>
+    <div class="detail" id="detail"></div>
+  </section>
+</header>
+
+<section class="picks" id="picks" aria-labelledby="picksTitle" hidden>
+  <div class="picks-head"><h2 id="picksTitle">Picks</h2><small class="muted" id="picksMeta"></small></div>
+  <div class="picks-grid" id="picksGrid"></div>
+  <p class="prev" id="picksPrev"></p>
+</section>
+
+<nav class="tabs" role="tablist">
+  <button class="tab" role="tab" data-tab="odds" aria-selected="true">Odds</button>
+  <button class="tab" role="tab" data-tab="hc" aria-selected="false">Hot and cold</button>
+  <button class="tab" role="tab" data-tab="forecast" aria-selected="false">Forecast generator</button>
+  <button class="tab" role="tab" data-tab="random" aria-selected="false">Randomness tests</button>
+  <button class="tab" role="tab" data-tab="backtest" aria-selected="false">Strategy backtest</button>
+  <button class="tab" role="tab" data-tab="value" aria-selected="false">Ticket value</button>
+  <button class="tab" role="tab" data-tab="tickets" aria-selected="false">Ticket picker</button>
+  <button class="tab" role="tab" data-tab="data" aria-selected="false">Draw data</button>
+</nav>
+
+<section class="panel on" id="p-odds" role="tabpanel">
+  <h2>Exact odds per division</h2>
+  <p class="intro" id="oddsIntro"></p>
+  <div class="scroll"><table id="oddsTable"></table></div>
+  <h3>What doesn't change the odds</h3>
+  <p class="intro" id="oddsNote"></p>
+</section>
+
+<section class="panel" id="p-hc" role="tabpanel">
+  <h2>Hot and cold numbers</h2>
+  <p class="intro">Hot and cold describe the past. Each view below puts the numbers next to what fair draws would produce, so you can see whether anything stands out beyond ordinary luck.</p>
+  <div class="subnav" role="tablist" aria-label="Hot and cold views">
+    <button class="sub" role="tab" data-v="hot">Hot numbers</button>
+    <button class="sub" role="tab" data-v="cold">Cold numbers</button>
+    <button class="sub" role="tab" data-v="pairs">Hot pairs of numbers</button>
+    <button class="sub" role="tab" data-v="ab">Number A or B</button>
+    <button class="sub" role="tab" data-v="map">Map draws</button>
+  </div>
+  <div class="controls">
+    <label>Draws to include<select id="hcWindow"><option value="all">All in range</option><option value="10">Last 10</option><option value="20">Last 20</option><option value="50">Last 50</option><option value="100">Last 100</option></select></label>
+    <div id="hcSetWrap" style="display:flex;gap:6px;align-items:end"><button class="setb" data-s="main">Main balls</button><button class="setb" data-s="pb">PowerBall</button></div>
+    <div id="abWrap" style="display:flex;gap:14px"><label>Number A<input type="number" id="abA" value="7" min="1" style="width:90px"></label><label>Number B<input type="number" id="abB" value="24" min="1" style="width:90px"></label></div>
+  </div>
+  <div id="hcOut"></div>
+</section>
+
+<section class="panel" id="p-forecast" role="tabpanel">
+  <h2>Forecast generator</h2>
+  <p class="intro">Builds the 10 best-scoring combinations from past draws using the factors you weight below. Each number gets a forecast weight from its frequency in the look-back window, its recent form (recent draws count more, halving in weight every few draws) and how overdue it is. Candidate combinations are then scored on those weights, how often their pairs appeared together, how balanced they are, and how rarely other players pick them.</p>
+  <div class="controls fc"><label>Hot frequency<input type="range" id="fc_hot" min="0" max="3" step="0.5" value="1"><output id="fco_hot">1</output></label><label>Recent form<input type="range" id="fc_recent" min="0" max="3" step="0.5" value="1"><output id="fco_recent">1</output></label><label>Overdue<input type="range" id="fc_overdue" min="0" max="3" step="0.5" value="0"><output id="fco_overdue">0</output></label><label>Hot pairs<input type="range" id="fc_pairs" min="0" max="3" step="0.5" value="1"><output id="fco_pairs">1</output></label><label>Balanced sum and odd/even<input type="range" id="fc_balance" min="0" max="3" step="0.5" value="1"><output id="fco_balance">1</output></label><label>Avoid popular picks<input type="range" id="fc_avoid" min="0" max="3" step="0.5" value="1"><output id="fco_avoid">1</output></label>
+    <label>Look-back window (draws)<input type="number" id="fcWindow" value="30" min="3"></label>
+    <label>Recent-form half-life (draws)<input type="number" id="fcHalf" value="8" min="1"></label>
+    <label>Seed<input type="number" id="fcSeed" value="2026"></label>
+    <button class="btn" id="fcRun">Generate 10 combinations</button>
+  </div>
+  <h3>Forecast weight per number</h3>
+  <div class="chart"><svg id="fcBars" viewBox="0 0 1040 150" width="100%" role="img" aria-label="Model weight per number"></svg></div>
+  <h3>Top 10 combinations</h3>
+  <div id="fcOut"></div>
+  <h3>How would this generator have done?</h3>
+  <div class="controls"><button class="btn alt" id="fcTestBtn">Test on past draws</button></div>
+  <p class="note" id="fcTest">Runs the generator draw by draw on history it hadn't seen yet and compares its matches with random picks.</p>
+</section>
+
+<section class="panel" id="p-random" role="tabpanel">
+  <h2>Do the draws look random?</h2>
+  <p class="intro">Each test compares the real draws with what a fair draw would produce. A p-value below 0.05 means the result would be unusual under fair draws. With many tests, expect about 1 in 20 to fall below 0.05 by chance alone.</p>
+  <div class="stat-row" id="chiStats"></div>
+  <div class="chart"><svg id="freqChart" viewBox="0 0 1040 280" width="100%" role="img" aria-label="Frequency of each ball compared with the expected count"></svg></div>
+  <p class="note" id="chiNote"></p>
+  <h3>Pattern tests</h3>
+  <div class="scroll"><table id="patternTable"></table></div>
+  <h3>Odd numbers per draw</h3>
+  <div class="scroll"><table id="oddTable"></table></div>
+</section>
+
+<section class="panel" id="p-backtest" role="tabpanel">
+  <h2>Can any strategy beat a random pick?</h2>
+  <p class="intro">Walk-forward test: for each draw, a strategy picks numbers using only the draws before it, then we count matches. The yellow line is the exact average for a random pick, and the shaded band shows where 95% of random pickers land over the same draws.</p>
+  <div class="controls">
+    <label>Look-back window (draws)<input type="number" id="btWindow" value="20" min="3" max="500"></label>
+    <label>Warm-up draws skipped<input type="number" id="btWarm" value="5" min="1" max="500"></label>
+    <label>Random seed<input type="number" id="btSeed" value="2026"></label>
+    <button class="btn" id="btRun">Run backtest</button>
+  </div>
+  <div class="chart"><svg id="btChart" viewBox="0 0 1040 300" width="100%" role="img" aria-label="Average matches per strategy against the random band"></svg></div>
+  <div class="scroll"><table id="btTable"></table></div>
+  <p class="note" id="btNote"></p>
+</section>
+
+<section class="panel" id="p-value" role="tabpanel">
+  <h2>What is one board worth?</h2>
+  <p class="intro">Expected value = sum of (probability × prize) over every division. The top prize is shared if others also win, so the calculator models other winners as a Poisson count based on how many boards are sold. Edit any prize in the table.</p>
+  <div class="controls">
+    <label>Top prize (R)<input type="number" id="vJackpot" step="100000"></label>
+    <label>Boards sold this draw<input type="number" id="vSold" step="100000"></label>
+    <label>Board price (R)<input type="number" id="vPrice" step="0.5"></label>
+    <label>Boards per week<input type="number" id="vWeekly" value="2" min="1"></label>
+  </div>
+  <div class="stat-row" id="valueStats"></div>
+  <div class="scroll"><table id="valueTable"></table></div>
+  <p class="note" id="prizeNote"></p>
+</section>
+
+<section class="panel" id="p-tickets" role="tabpanel">
+  <h2>Pick numbers other players avoid</h2>
+  <p class="intro">No pick can improve your chance of winning. What you can change is how many people you'd share a prize with. Many players choose birthdays (1–31), sequences, patterns and past winning numbers, so those combinations get split more ways when they come up. This picker draws random tickets and keeps those that score lowest on those habits.</p>
+  <div class="controls">
+    <label>Number of tickets<input type="number" id="tCount" value="5" min="1" max="20"></label>
+    <button class="btn" id="tRun">Generate tickets</button>
+  </div>
+  <div id="tickets"></div>
+  <p class="note">Popularity score: +3 if every number is 31 or lower (+1.5 if only one is above 31), +2 for a run of 3 or more consecutive numbers, +5 for an evenly spaced set, +1 for 3 or more multiples of 7, +1 for many numbers ending in the same digit, +5 for any past winning combination and +2 for all but one number matching one. Lower is less popular. These weights are heuristics based on known player habits, not measured sales data.</p>
+</section>
+
+<section class="panel" id="p-data" role="tabpanel">
+  <h2>Draw data</h2>
+  <p class="intro">Built-in data comes from the official National Lottery results (nationallottery.co.za) and is refreshed every night. It covers each game since its current rules began in June 2026. Import older draws below if you have them. Draws you add are kept in this browser only, separately for each game.</p>
+  <div class="controls">
+    <label>Analyse draws from<input type="date" id="fromDate"></label>
+    <label>to<input type="date" id="toDate"></label>
+    <button class="btn alt" id="applyRange">Apply range</button>
+  </div>
+  <h3>Add a draw</h3>
+  <div class="controls">
+    <label>Date<input type="date" id="addDate"></label>
+    <label>Numbers<input type="text" id="addNums" style="width:190px"></label>
+    <label id="addBonusWrap"><span id="addBonusLabel">Bonus</span><input type="number" id="addBonus" min="1" style="width:90px"></label>
+    <button class="btn" id="addBtn">Add draw</button>
+  </div>
+  <div class="msg" id="addMsg" role="status"></div>
+  <h3>Import or export CSV</h3>
+  <p class="intro">One draw per line: <code id="csvFormat"></code>, with dates as YYYY-MM-DD. Use this to load a longer history for the selected game.</p>
+  <textarea id="csvBox" aria-label="CSV data"></textarea>
+  <div class="controls" style="background:none;border:0;padding:0">
+    <button class="btn" id="importBtn">Import CSV</button>
+    <button class="btn alt" id="exportBtn">Show all data as CSV</button>
+    <button class="btn alt" id="resetBtn">Remove added draws</button>
+  </div>
+  <div class="msg" id="csvMsg" role="status"></div>
+  <h3>All draws</h3>
+  <div class="scroll"><table id="drawTable"></table></div>
+</section>
+</div>
+<script src="data/draws.js"></script>
+<script src="data/picks.js"></script>
+<script src="js/core.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

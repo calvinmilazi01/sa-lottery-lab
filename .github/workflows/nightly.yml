@@ -1,0 +1,79 @@
+name: Nightly results, picks and deploy
+
+on:
+  schedule:
+    - cron: "0 21 * * *"   # 23:00 SAST: sync tonight's results, prepare tomorrow's picks
+    - cron: "0 5 * * *"    # 07:00 SAST: catch up on anything missed, send today's picks to your phone
+  workflow_dispatch:
+    inputs:
+      notify:
+        description: "Send the picks notification"
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Sync results from the official API
+        if: github.event_name != 'push'
+        run: node scripts/update-draws.mjs
+
+      - name: Build picks
+        if: github.event_name != 'push'
+        env:
+          PICK_GAMES: ${{ vars.PICK_GAMES }}
+          PICKS_PER_GAME: ${{ vars.PICKS_PER_GAME }}
+        run: node scripts/picks.mjs
+
+      - name: Commit data
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then echo "No changes"; else
+            git commit -m "Results and picks for $(TZ=Africa/Johannesburg date +%F)"
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Send picks to phone
+        if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && inputs.notify)
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ vars.NTFY_SERVER }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PICK_GAMES: ${{ vars.PICK_GAMES }}
+          PICKS_PER_GAME: ${{ vars.PICKS_PER_GAME }}
+        run: node scripts/picks.mjs --notify

@@ -1,0 +1,1 @@
+window.SALAB_PICKS={"generated":"2026-09-30T19:38:09.319Z","date":"2026-10-01","settings":{"window":30,"halfLife":8,"hot":1,"recent":1,"overdue":0,"pairs":1,"balance":1,"avoid":1},"games":{"daily":{"name":"Daily Lotto","basedOn":122,"tickets":[{"t":[5,7,20,21,36],"pb":null,"score":3.12}],"jackpot":520000,"odds":"1 in 376 992"}},"previous":null};

@@ -1,0 +1,12 @@
+{
+  "name": "sa-lottery-lab",
+  "private": true,
+  "description": "SA Lottery Probability Lab: GitHub Pages site with nightly official results and daily picks",
+  "scripts": {
+    "update": "node scripts/update-draws.mjs",
+    "picks": "node scripts/picks.mjs",
+    "notify": "node scripts/picks.mjs --notify",
+    "serve": "node scripts/serve.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
