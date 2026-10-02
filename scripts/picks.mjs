@@ -123,7 +123,9 @@ if (process.argv.includes("--notify")) {
         ...(env.NTFY_TOKEN ? { Authorization: `Bearer ${env.NTFY_TOKEN}` } : {}),
       },
     });
-    console.log(`ntfy: HTTP ${r.status}${r.ok ? "" : ` ${(await r.text()).trim()}`}`); if (r.ok) sent++;
+    // Partial topic so a mismatch with the phone's subscription can be spotted (topics are case-sensitive)
+    const hint = `${topic.slice(0, 3)}…${topic.slice(-2)}, ${topic.length} characters`;
+    console.log(`ntfy: HTTP ${r.status} (topic ${hint})${r.ok ? "" : ` ${(await r.text()).trim()}`}`); if (r.ok) sent++;
   }
   if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) {
     tried++;
