@@ -67,4 +67,4 @@ npm run serve
 - `scripts/`: the results sync, picks/notify and local server
 - `.github/workflows/nightly.yml`: the schedule
 
-The data comes from the public results API behind nationallottery.co.za (`/api/engine/draw/issueWinPoolInfoPageQuery`). If the operator changes it, the sync step fails and GitHub emails you. The site keeps showing the last good data.
+Results come from the public results API behind nationallottery.co.za (`/api/engine/draw/issueWinPoolInfoPageQuery`). That API refuses GitHub's servers (HTTP 403), so on GitHub the sync falls back to the latest 10 draws listed on za.lottonumbers.com. Run `npm run update` on your own PC to refill the full official history if a long gap ever builds up. If both sources fail, the run is marked failed and GitHub emails you, but the site and notification still go out using the last good data.

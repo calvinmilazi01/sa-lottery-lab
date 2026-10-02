@@ -31,25 +31,27 @@ jobs:
     env:
       SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
-      - name: Sync results from the official API
+      # If the sync fails, carry on with the last good data so the site and notification still go out;
+      # the run is still marked failed so GitHub emails you.
+      - name: Sync results
         if: github.event_name != 'push'
         run: node scripts/update-draws.mjs
 
       - name: Build picks
-        if: github.event_name != 'push'
+        if: ${{ !cancelled() && github.event_name != 'push' }}
         env:
           PICK_GAMES: ${{ vars.PICK_GAMES }}
           PICKS_PER_GAME: ${{ vars.PICKS_PER_GAME }}
         run: node scripts/picks.mjs
 
       - name: Commit data
-        if: github.event_name != 'push'
+        if: ${{ !cancelled() && github.event_name != 'push' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -60,14 +62,17 @@ jobs:
           fi
 
       - uses: actions/configure-pages@v5
+        if: ${{ !cancelled() }}
       - uses: actions/upload-pages-artifact@v3
+        if: ${{ !cancelled() }}
         with:
           path: .
       - id: deployment
+        if: ${{ !cancelled() }}
         uses: actions/deploy-pages@v4
 
       - name: Send picks to phone
-        if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && inputs.notify)
+        if: ${{ !cancelled() && (github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && inputs.notify)) }}
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           NTFY_SERVER: ${{ vars.NTFY_SERVER }}
