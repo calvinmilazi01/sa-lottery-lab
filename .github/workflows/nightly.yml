@@ -37,10 +37,11 @@ jobs:
         with:
           node-version: 22
 
-      # If the sync fails, carry on with the last good data so the site and notification still go out;
-      # the run is still marked failed so GitHub emails you.
+      # Best-effort backup: results sites often block GitHub's servers, so the main sync runs on your PC
+      # (scripts/pc-sync.mjs) and pushes data/. If this fails, carry on with the last pushed data.
       - name: Sync results
         if: github.event_name != 'push'
+        continue-on-error: true
         run: node scripts/update-draws.mjs
 
       - name: Build picks

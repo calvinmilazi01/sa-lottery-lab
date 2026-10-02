@@ -8,11 +8,29 @@ A probability lab for the South African National Lottery (Lotto, Lotto Plus 1, L
 
 | Time (SAST) | What runs |
 |---|---|
-| 23:00 nightly | `scripts/update-draws.mjs` pulls every draw from the official results API into `data/draws.json` / `data/draws.js`. `scripts/picks.mjs` builds 5 picks for each game's next draw into `data/picks.json` / `data/picks.js`. The workflow commits `data/` and redeploys the site. |
-| 07:00 daily | Catches up on any results missed overnight, redeploys and sends **today's picks** to your phone. The message also shows how the previous picks did against the results. |
-| Any push to `main` | Redeploys the site. |
+| 22:30 and 06:30, on your PC | Windows Task Scheduler runs `scripts/pc-sync.mjs`. It fetches the official results (`scripts/update-draws.mjs`), builds 5 picks for each game's next draw (`scripts/picks.mjs`) and pushes `data/` to GitHub. If the PC was off, it runs as soon as the PC is back on. |
+| Any push to `main` | GitHub redeploys the site. |
+| 23:00 nightly, on GitHub | Backup sync (often blocked, see below), rebuilds picks and redeploys. |
+| 07:00 daily, on GitHub | Same as the nightly run, then sends **today's picks** to your phone, along with how the previous picks did. |
 
 GitHub can start scheduled runs 5–30 minutes late at busy times.
+
+### Why the sync runs on your PC
+
+The official results API (nationallottery.co.za) returns HTTP 403 to GitHub's servers. The backup site, za.lottonumbers.com, also starts dropping their requests after a while. Both work fine from South African connections. So the main sync runs on your PC, and GitHub only deploys the site and sends notifications.
+
+**Set up the PC task** (once, in PowerShell from this folder; it needs `node` and `git` installed and a working `git push`):
+
+```powershell
+$node = (Get-Command node).Source
+$script = (Resolve-Path scripts\pc-sync.mjs).Path
+$action = New-ScheduledTaskAction -Execute "conhost.exe" -Argument "--headless `"$node`" `"$script`""
+$triggers = @((New-ScheduledTaskTrigger -Daily -At 22:30), (New-ScheduledTaskTrigger -Daily -At 06:30))
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RunOnlyIfNetworkAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
+Register-ScheduledTask -TaskName "SA Lottery Lab sync" -Action $action -Trigger $triggers -Settings $settings -Description "Official lottery results -> picks -> GitHub"
+```
+
+Run it now with `Start-ScheduledTask "SA Lottery Lab sync"`. Check what it did in `%LOCALAPPDATA%\sa-lottery-lab-sync.log`. Remove it with `Unregister-ScheduledTask "SA Lottery Lab sync"`. The task works in its own clone at `%LOCALAPPDATA%\sa-lottery-lab-sync`, so it never touches your working copy.
 
 The page shows the 5 picks for whichever game is selected at the top. The phone notification only includes games drawn that day. The draw schedule is worked out from recent draw dates: Daily Lotto every day, Lotto on Wednesdays and Saturdays, PowerBall on Tuesdays and Fridays.
 
@@ -44,7 +62,7 @@ Set these under **Settings → Secrets and variables → Actions → Variables**
 
 ## Updating on demand
 
-The **Update now** button on the picks card starts the same workflow, waits for it (about a minute), then reloads the new results and picks. You can also choose to send the picks to your phone. The first time, it asks for a GitHub token, which is saved only in that browser:
+The **Update now** button on the picks card starts the GitHub workflow. Its results sync is the GitHub backup, which is often blocked, so it may only rebuild and redeploy what your PC last pushed. The page waits for the run (about a minute), then reloads the new results and picks. You can also choose to send the picks to your phone. The first time, it asks for a GitHub token, which is saved only in that browser:
 
 1. Create a [fine-grained token](https://github.com/settings/personal-access-tokens/new).
 2. Under **Repository access**, choose **Only select repositories** and pick this repo.
@@ -77,4 +95,4 @@ npm run serve
 - `scripts/`: the results sync, picks/notify and local server
 - `.github/workflows/nightly.yml`: the schedule
 
-Results come from the public results API behind nationallottery.co.za (`/api/engine/draw/issueWinPoolInfoPageQuery`). That API refuses GitHub's servers (HTTP 403), so on GitHub the sync falls back to the latest 10 draws listed on za.lottonumbers.com. Run `npm run update` on your own PC to refill the full official history if a long gap ever builds up. If both sources fail, the run is marked failed and GitHub emails you, but the site and notification still go out using the last good data.
+Results come from the public results API behind nationallottery.co.za (`/api/engine/draw/issueWinPoolInfoPageQuery`). When the API is unreachable, the sync falls back to the latest 10 draws on za.lottonumbers.com. If a run can't get new results, the site and notification still go out using the last good data.
