@@ -101,9 +101,15 @@ const body = lines.join("\n");
 console.log(title + "\n" + body);
 
 if (process.argv.includes("--notify")) {
-  let sent = 0;
-  if (env.NTFY_TOPIC) {
-    const r = await fetch(`${(env.NTFY_SERVER || "https://ntfy.sh").replace(/\/$/, "")}/${env.NTFY_TOPIC}`, {
+  let sent = 0, tried = 0;
+  // Accept the bare topic or a pasted subscription link ("ntfy.sh/topic", "https://ntfy.sh/topic"), ignoring stray whitespace
+  const topic = (env.NTFY_TOPIC || "").trim().replace(/^(https?:\/\/)?[^/\s]+\.[^/\s]+\//i, "").replace(/^\/+|\/+$/g, "");
+  if (env.NTFY_TOPIC && !/^[\w-]{1,64}$/.test(topic)) {
+    tried++;
+    console.error("ntfy: NTFY_TOPIC isn't a valid topic name. Use only letters, numbers, - or _ (no spaces), e.g. salab-k7q2m9xw4t.");
+  } else if (topic) {
+    tried++;
+    const r = await fetch(`${(env.NTFY_SERVER || "https://ntfy.sh").replace(/\/$/, "")}/${topic}`, {
       method: "POST", body,
       headers: {
         Title: title, Tags: "game_die", Priority: "default",
@@ -111,14 +117,18 @@ if (process.argv.includes("--notify")) {
         ...(env.NTFY_TOKEN ? { Authorization: `Bearer ${env.NTFY_TOKEN}` } : {}),
       },
     });
-    console.log(`ntfy: HTTP ${r.status}`); if (r.ok) sent++;
+    console.log(`ntfy: HTTP ${r.status}${r.ok ? "" : ` ${(await r.text()).trim()}`}`); if (r.ok) sent++;
   }
   if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) {
+    tried++;
     const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: `${title}\n\n${body}${env.SITE_URL ? `\n\n${env.SITE_URL}` : ""}`, disable_web_page_preview: true }),
     });
     console.log(`telegram: HTTP ${r.status}`); if (r.ok) sent++;
   }
-  if (!sent) { console.error("No notification sent: set NTFY_TOPIC and/or TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID."); process.exit(1); }
+  if (!sent) {
+    console.error(tried ? "No notification was delivered (see the error above)." : "No notification sent: set NTFY_TOPIC and/or TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID.");
+    process.exit(1);
+  }
 }
