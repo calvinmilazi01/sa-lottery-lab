@@ -8,13 +8,13 @@ A probability lab for the South African National Lottery (Lotto, Lotto Plus 1, L
 
 | Time (SAST) | What runs |
 |---|---|
-| 23:00 nightly | `scripts/update-draws.mjs` pulls every draw from the official results API into `data/draws.json` / `data/draws.js`. `scripts/picks.mjs` builds tomorrow's picks into `data/picks.json` / `data/picks.js`. The workflow commits `data/` and redeploys the site. |
+| 23:00 nightly | `scripts/update-draws.mjs` pulls every draw from the official results API into `data/draws.json` / `data/draws.js`. `scripts/picks.mjs` builds 5 picks for each game's next draw into `data/picks.json` / `data/picks.js`. The workflow commits `data/` and redeploys the site. |
 | 07:00 daily | Catches up on any results missed overnight, redeploys and sends **today's picks** to your phone. The message also shows how the previous picks did against the results. |
 | Any push to `main` | Redeploys the site. |
 
 GitHub can start scheduled runs 5–30 minutes late at busy times.
 
-Picks are only made for games drawn that day. The schedule is worked out from recent draw dates: Daily Lotto every day, Lotto on Wednesdays and Saturdays, PowerBall on Tuesdays and Fridays.
+The page shows the 5 picks for whichever game is selected at the top. The phone notification only includes games drawn that day. The draw schedule is worked out from recent draw dates: Daily Lotto every day, Lotto on Wednesdays and Saturdays, PowerBall on Tuesdays and Fridays.
 
 ## Setup
 
@@ -38,9 +38,19 @@ Set these under **Settings → Secrets and variables → Actions → Variables**
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PICK_GAMES` | all games | Comma-separated game ids: `lotto,plus1,plus2,daily,pb,pbx` |
-| `PICKS_PER_GAME` | `1` | Tickets per game (1–5), taking the top N from the forecast generator |
+| `PICK_GAMES` | all games | Games to include in the notification, as comma-separated ids: `lotto,plus1,plus2,daily,pb,pbx` |
+| `PICKS_PER_GAME` | `5` | Tickets per game in the notification (1–5). The page always shows 5. |
 | `NTFY_SERVER` | `https://ntfy.sh` | Self-hosted ntfy server. For a protected topic, also add the secret `NTFY_TOKEN`. |
+
+## Updating on demand
+
+The **Update now** button on the picks card starts the same workflow, waits for it (about a minute), then reloads the new results and picks. You can also choose to send the picks to your phone. The first time, it asks for a GitHub token, which is saved only in that browser:
+
+1. Create a [fine-grained token](https://github.com/settings/personal-access-tokens/new).
+2. Under **Repository access**, choose **Only select repositories** and pick this repo.
+3. Under **Permissions**, add **Actions** and set it to **Read and write**. Nothing else is needed.
+
+That token can only start and read this repo's workflow runs. Use **Forget saved token** in the update panel to remove it from a browser. Without a token, use **Actions → Run workflow** on GitHub instead.
 
 ## Local use
 

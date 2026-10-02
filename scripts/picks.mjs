@@ -1,11 +1,13 @@
-// Builds the day's picks with the app's forecast generator (default settings) for every game drawn
-// that day, scores yesterday's picks against the results, and optionally pushes a phone notification.
+// Builds 5 forecast picks for every game's next draw with the app's forecast generator (default
+// settings), scores each game's previous picks against its results, and optionally pushes a phone
+// notification with the picks for games drawn today.
 //
 //   node scripts/picks.mjs            write data/picks.json + data/picks.js
-//   node scripts/picks.mjs --notify   ...and send them via ntfy and/or Telegram (see README)
+//   node scripts/picks.mjs --notify   ...and send today's picks via ntfy and/or Telegram (see README)
 //
 // Env: PICK_DATE=YYYY-MM-DD (default: today in SAST, or tomorrow after 21:00 SAST)
-//      PICK_GAMES=lotto,daily,...  (default: every game with data)   PICKS_PER_GAME=1..5 (default 1)
+//      PICK_GAMES=lotto,daily,...  games to include in the notification (default: all)
+//      PICKS_PER_GAME=1..5  tickets per game in the notification (default 5; the site always gets 5)
 //      NTFY_TOPIC, NTFY_SERVER, NTFY_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, SITE_URL
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -20,7 +22,8 @@ setSeeds(DATA.draws);
 
 // Same defaults as the Forecast generator tab
 const OPTS = { window: 30, halfLife: 8, hot: 1, recent: 1, overdue: 0, pairs: 1, balance: 1, avoid: 1 };
-const perGame = Math.min(5, Math.max(1, +env.PICKS_PER_GAME || 1));
+const TICKETS = 5;
+const perGame = Math.min(TICKETS, Math.max(1, +env.PICKS_PER_GAME || TICKETS));
 const only = env.PICK_GAMES ? env.PICK_GAMES.split(",").map(s => s.trim()) : null;
 
 const sastNow = new Date(Date.now() + 2 * 3600e3);
@@ -39,60 +42,63 @@ function drawsOn(g, d) {
   const days = new Set(recent.map(x => weekday(x.d))).size;
   return recent.filter(x => weekday(x.d) === weekday(d)).length >= 0.5 * recent.length / days;
 }
+const nextDraw = g => { for (let k = 0; k < 8; k++) { const d = addDays(date, k); if (drawsOn(g, d)) return d; } return null; };
 
-const games = {};
-for (const g of Object.values(GAMES)) {
-  if (g.retired || (only && !only.includes(g.id)) || !drawsOn(g, date)) continue;
-  const D = g.seed.filter(x => x.d < date);
-  if (D.length < 5) continue;
-  const rng = mulberry32(hashStr(date + g.id));
-  const { combos } = forecastCombos(g, D, D.length, OPTS, perGame, 20000, rng, D);
-  games[g.id] = {
-    name: g.name, basedOn: D.length,
-    tickets: combos.map(c => ({ t: c.t, pb: c.pb ?? null, score: +c.score.toFixed(2) })),
-    jackpot: DATA.info?.[g.id]?.nextJackpot ?? null,
-    odds: fmtOddsPlain(divisions(g)[0].p),
+// Score a game's earlier picks once its draw is in
+function score(g, p) {
+  const draw = g.seed.find(x => x.d === p.date);
+  if (!draw) return null;
+  return {
+    date: p.date, draw: { n: draw.n, b: draw.b },
+    tickets: p.tickets.map(tk => ({
+      t: tk.t, pb: tk.pb,
+      matches: tk.t.filter(x => draw.n.includes(x)).length,
+      bonus: g.type === "sep" ? tk.pb === draw.b : g.type === "same" ? tk.t.includes(draw.b) : false,
+    })),
   };
 }
 
-// Score the last set of picks whose draw has now happened
 const old = existsSync(PICKS_JSON) ? JSON.parse(readFileSync(PICKS_JSON, "utf8")) : null;
-let previous = null;
-if (old && old.date === date) previous = old.previous;
-else if (old && old.date < date) {
-  previous = { date: old.date, games: {} };
-  for (const [id, p] of Object.entries(old.games || {})) {
-    const g = GAMES[id], draw = g?.seed.find(x => x.d === old.date);
-    if (!draw) continue;
-    previous.games[id] = {
-      name: p.name, draw: { n: draw.n, b: draw.b },
-      tickets: p.tickets.map(tk => ({
-        ...tk,
-        matches: tk.t.filter(x => draw.n.includes(x)).length,
-        bonus: g.type === "sep" ? tk.pb === draw.b : g.type === "same" ? tk.t.includes(draw.b) : false,
-      })),
-    };
-  }
-  if (!Object.keys(previous.games).length) previous = old.previous ?? null;
+const games = {};
+for (const g of Object.values(GAMES)) {
+  const when = g.retired ? null : nextDraw(g);
+  if (!when) continue;
+  const D = g.seed.filter(x => x.d < when);
+  if (D.length < 5) continue;
+  const rng = mulberry32(hashStr(when + g.id));
+  const { combos } = forecastCombos(g, D, D.length, OPTS, TICKETS, 20000, rng, D);
+  const prev = old?.games?.[g.id], prevDate = prev?.date || old?.date;
+  const legacy = old?.previous?.games?.[g.id];   // older file layout kept one shared "previous" block
+  let previous = prev?.previous ?? (legacy ? { ...legacy, date: old.previous.date } : null);
+  if (prev && prevDate < when) previous = score(g, { ...prev, date: prevDate }) || previous;
+  games[g.id] = {
+    name: g.name, date: when, basedOn: D.length,
+    tickets: combos.map(c => ({ t: c.t, pb: c.pb ?? null, score: +c.score.toFixed(2) })),
+    jackpot: DATA.info?.[g.id]?.nextJackpot ?? null,
+    odds: fmtOddsPlain(divisions(g)[0].p),
+    previous,
+  };
 }
 
-const out = { generated: new Date().toISOString(), date, settings: OPTS, games, previous };
+const out = { generated: new Date().toISOString(), date, settings: OPTS, games };
 writeFileSync(PICKS_JSON, JSON.stringify(out, null, 1) + "\n");
 writeFileSync(PICKS_JS, "window.SALAB_PICKS=" + JSON.stringify(out) + ";\n");
 
-// ---------- message ----------
+// ---------- message: games drawn on `date` ----------
 const nums = tk => tk.t.join(" ") + (tk.pb != null ? ` + PB ${tk.pb}` : "");
+const todays = Object.entries(games).filter(([id, p]) => p.date === date && (!only || only.includes(id))).map(([, p]) => p);
 const lines = [];
-if (!Object.keys(games).length) lines.push(`No draws scheduled for ${fmtDay(date)}.`);
-for (const p of Object.values(games)) {
+if (!todays.length) lines.push(`No draws scheduled for ${fmtDay(date)}.`);
+for (const p of todays) {
   lines.push(`${p.name}${p.jackpot ? ` (${rands(p.jackpot)})` : ""}:`);
-  for (const tk of p.tickets) lines.push(`  ${nums(tk)}`);
+  for (const tk of p.tickets.slice(0, perGame)) lines.push(`  ${nums(tk)}`);
 }
-if (previous && Object.keys(previous.games).length) {
-  lines.push("", `Results ${fmtDay(previous.date)}:`);
-  for (const p of Object.values(previous.games)) {
-    const best = p.tickets.reduce((a, b) => (b.matches > a.matches ? b : a));
-    lines.push(`  ${p.name}: ${p.draw.n.join(" ")}${p.draw.b != null ? ` + ${p.draw.b}` : ""} - pick matched ${best.matches}${best.bonus ? " + bonus" : ""}`);
+const recent = Object.entries(games).filter(([id, p]) => p.previous && p.previous.date >= addDays(date, -1) && (!only || only.includes(id)));
+if (recent.length) {
+  lines.push("", "Last results vs picks:");
+  for (const [, p] of recent) {
+    const pv = p.previous, best = pv.tickets.reduce((a, b) => (b.matches > a.matches ? b : a));
+    lines.push(`  ${p.name} ${fmtDay(pv.date)}: ${pv.draw.n.join(" ")}${pv.draw.b != null ? ` + ${pv.draw.b}` : ""} - best pick matched ${best.matches}${best.bonus ? " + bonus" : ""}`);
   }
 }
 lines.push("", "Every combination has the same odds; these are the forecast model's top scores.");

@@ -7,9 +7,10 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",
 const fmtDate=d=>new Date(d+"T12:00:00").toLocaleDateString("en-ZA",{day:"numeric",month:"short",year:"numeric"});
 const ball=(x,cls="")=>`<span class="mini ${cls}">${x}</span>`;
 
-const DATA=window.SALAB_DATA||{draws:{},info:{}},PICKS=window.SALAB_PICKS||null;
+let DATA=window.SALAB_DATA||{draws:{},info:{}},PICKS=window.SALAB_PICKS||null;
 // latest jackpot estimate and sales from the nightly sync replace the hand-set defaults
-for(const[id,inf]of Object.entries(DATA.info||{}))if(GAMES[id]){if(inf.nextJackpot)GAMES[id].jackpot=inf.nextJackpot;if(inf.boardsSold)GAMES[id].sold=inf.boardsSold;}
+function applyInfo(){for(const[id,inf]of Object.entries(DATA.info||{}))if(GAMES[id]){if(inf.nextJackpot)GAMES[id].jackpot=inf.nextJackpot;if(inf.boardsSold)GAMES[id].sold=inf.boardsSold;}}
+applyInfo();
 let gid="lotto";try{const s=localStorage.getItem("salab-game");if(s&&GAMES[s])gid=s;}catch(e){}
 const G=()=>GAMES[gid];
 const addedCache={};
@@ -50,7 +51,7 @@ function setupGameUI(){const g=G(),divs=divisions(g);
 
 /* ---------- hero ---------- */
 function renderMeta(){const D=active(),all=allDraws(),g=G();const L=D[D.length-1];
-  $("meta").textContent=D.length?`Analysing ${D.length} of ${all.length} ${g.name} draws, ${fmtDate(D[0].d)} to ${fmtDate(L.d)}. Latest: ${L.n.join(", ")}${L.b!=null?" + "+L.b:""}.${DATA.updated?` Results synced ${new Date(DATA.updated).toLocaleString("en-ZA",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}.`:""}`:`No ${g.name} draws loaded yet. Add or import draws in the Draw data tab.`;}
+  $("meta").textContent=D.length?`Analysing ${D.length} of ${all.length} ${g.name} draws, ${fmtDate(D[0].d)} to ${fmtDate(L.d)}. Latest: ${L.n.join(", ")}${L.b!=null?" + "+L.b:""}.`:`No ${g.name} draws loaded yet. Add or import draws in the Draw data tab.`;}
 function renderGrid(){const g=G(),D=active(),n=D.length,c=counts(D,g.N),p=g.K/g.N,E=n*p,sd=Math.sqrt(n*p*(1-p))||1,el=$("grid52");el.innerHTML="";
   for(let i=1;i<=g.N;i++){const z=n?(c[i]-E)/sd:0,t=Math.max(-1,Math.min(1,z/2.5)),pc=Math.round(Math.abs(t)*85);
     const b=document.createElement("button");b.className="b";b.textContent=i;b.setAttribute("aria-pressed",String(selected===i));
@@ -62,15 +63,63 @@ function renderDetail(){const i=selected,g=G();if(!i)return;const D=active(),n=D
   $("detail").innerHTML=`<strong>Ball ${i}</strong>: drawn ${c[i]} times in ${n} draws (expected ${fmtN(E,1)}, z = ${fmtN(z)}). Last drawn ${last}${gap<n?`, ${gap} draw${gap===1?"":"s"} ago`:""}. Chance of appearing in the next draw: ${g.K}/${g.N} = ${fmtN(p*100)}%, the same as every other ball.`;}
 
 /* ---------- daily picks ---------- */
-function renderPicks(){if(!PICKS||!PICKS.games)return;const box=$("picks"),sast=k=>new Date(Date.now()+2*3600e3+k*864e5).toISOString().slice(0,10);
-  const when=PICKS.date===sast(0)?"Today":PICKS.date===sast(1)?"Tomorrow":fmtDate(PICKS.date);box.hidden=false;
-  $("picksTitle").textContent=when.length<9?`${when}’s picks`:`Picks for ${when}`;
-  $("picksMeta").textContent=`${fmtDate(PICKS.date)} · Forecast generator, default settings · same odds as any other combination`;
-  const gs=Object.entries(PICKS.games);
-  $("picksGrid").innerHTML=gs.length?gs.map(([id,p])=>p.tickets.map((tk,i)=>`<div class="ticket">${i?"":`<span class="gname">${esc(p.name)}${p.jackpot?`<small>jackpot ${fmtR(p.jackpot)}</small>`:""}</span>`}<div class="balls">${tk.t.map(x=>ball(x)).join("")}${tk.pb!=null?ball(tk.pb,"bo"):""}</div></div>`).join("")).join(""):`<p class="muted">No draws on ${fmtDate(PICKS.date)}.</p>`;
-  const pv=PICKS.previous&&Object.values(PICKS.previous.games||{});
-  $("picksPrev").innerHTML=pv&&pv.length?`${fmtDate(PICKS.previous.date)} results vs picks: `+pv.map(p=>{const b=p.tickets.reduce((x,y)=>y.matches>x.matches?y:x);return`${esc(p.name)} matched ${b.matches}${b.bonus?" + bonus":""}`;}).join(" · "):"";
-  $("picksPrev").hidden=!(pv&&pv.length);}
+function renderPicks(){const g=G(),p=PICKS&&PICKS.games?PICKS.games[gid]:null,sast=k=>new Date(Date.now()+2*3600e3+k*864e5).toISOString().slice(0,10);
+  $("syncedAt").textContent=DATA.updated?`Results synced ${new Date(DATA.updated).toLocaleString("en-ZA",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`:"";
+  $("picksTitle").textContent=`${g.name} picks`;
+  if(!p){$("picksMeta").textContent=g.retired?`${g.name} no longer runs, so there's no upcoming draw to pick for.`:`No picks yet for ${g.name}. They're built each night once there are at least 5 draws.`;
+    $("picksGrid").innerHTML="";$("picksPrev").hidden=true;$("picksFoot").textContent="";return;}
+  const day=new Date(p.date+"T12:00:00").toLocaleDateString("en-ZA",{weekday:"long",day:"numeric",month:"short"}),rel=p.date===sast(0)?"Today, ":p.date===sast(1)?"Tomorrow, ":"";
+  $("picksMeta").textContent=`Next draw: ${rel}${day}${p.jackpot?` · jackpot ${fmtR(p.jackpot)}`:""}`;
+  $("picksGrid").innerHTML=p.tickets.map((tk,i)=>`<div class="ticket"><div class="balls"><span class="rank">${i+1}</span>${tk.t.map(x=>ball(x)).join("")}${tk.pb!=null?ball(tk.pb,"bo"):""}</div></div>`).join("");
+  const pv=p.previous;$("picksPrev").hidden=!pv;
+  if(pv){const best=Math.max(...pv.tickets.map(t=>t.matches)),bb=pv.tickets.some(t=>t.matches===best&&t.bonus);
+    $("picksPrev").innerHTML=`<strong>${fmtDate(pv.date)} draw</strong><span class="balls">${pv.draw.n.map(x=>ball(x)).join("")}${pv.draw.b!=null?ball(pv.draw.b,"bo"):""}</span><span class="muted">Best of ${pv.tickets.length} pick${pv.tickets.length>1?"s":""} matched ${best}${bb?" + bonus":""}${pv.tickets.length>1?` (each: ${pv.tickets.map(t=>t.matches).join(", ")})`:""}</span>`;}
+  $("picksFoot").textContent=`Top ${p.tickets.length} combinations from the Forecast generator on default settings, using ${p.basedOn} past draws. Each has the same ${p.odds} chance of winning the jackpot as any other.`;}
+
+/* ---------- manual update: runs the GitHub workflow, then reloads the data ---------- */
+// owner/repo comes from the Pages address (owner.github.io/repo/); elsewhere fall back to the main repo
+const REPO=location.hostname.endsWith(".github.io")&&location.pathname.split("/")[1]?`${location.hostname.split(".")[0]}/${location.pathname.split("/")[1]}`:"calvinmilazi01/sa-lottery-lab";
+const WORKFLOW="nightly.yml",TOKEN_KEY="salab-gh-token",runsLink=`https://github.com/${REPO}/actions/workflows/${WORKFLOW}`;
+const getToken=()=>{try{return localStorage.getItem(TOKEN_KEY)||"";}catch(e){return"";}};
+const setToken=t=>{try{t?localStorage.setItem(TOKEN_KEY,t):localStorage.removeItem(TOKEN_KEY);}catch(e){}};
+let updating=false;
+async function gh(path,opts={}){const r=await fetch(`https://api.github.com/repos/${REPO}${path}`,{...opts,headers:{Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28",Authorization:`Bearer ${getToken()}`,...(opts.body?{"Content-Type":"application/json"}:{})}});
+  if(r.status===401||r.status===403||r.status===404){const e=new Error(r.status===404?`GitHub couldn't find the repo or workflow with this token. Check that the token gives access to ${REPO}.`:"GitHub rejected the token. It may have expired, or it's missing the Actions read and write permission.");e.auth=true;throw e;}
+  if(!r.ok)throw new Error(`GitHub API error ${r.status}`);return r.status===204?null:r.json();}
+function showUpd(html){const b=$("updBox");b.hidden=!html;b.innerHTML=html||"";}
+function tokenForm(msg){showUpd(`${msg?`<p class="flag">${esc(msg)}</p>`:""}<p>Updating runs the same job as the nightly schedule on GitHub: it fetches the latest results, rebuilds the picks and redeploys this page, which takes about a minute. To start it from here, this page needs a GitHub token that can only run this repo's workflows. It's saved in this browser only.</p>
+  <ol><li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a fine-grained token</a> on GitHub.</li><li>Under <b>Repository access</b>, choose <b>Only select repositories</b> and pick <b>${esc(REPO.split("/")[1])}</b>.</li><li>Under <b>Permissions</b>, add <b>Actions</b> and set it to <b>Read and write</b>. Leave everything else as it is.</li><li>Generate the token, copy it, and paste it below.</li></ol>
+  <div class="row"><input type="password" id="tokIn" placeholder="github_pat_…" autocomplete="off" spellcheck="false" aria-label="GitHub token"><button class="btn sm" id="tokSave">Save and update</button><button class="linkbtn" id="updCancel">Cancel</button></div>
+  <p class="muted" style="margin:8px 0 0">Or <a href="${runsLink}" target="_blank" rel="noopener">run the workflow on GitHub</a> and reload this page a minute after it finishes.</p>`);
+  $("tokSave").onclick=()=>{const t=$("tokIn").value.trim();if(!t){$("tokIn").focus();return;}setToken(t);startUpdate();};
+  $("tokIn").onkeydown=e=>{if(e.key==="Enter")$("tokSave").click();};$("updCancel").onclick=()=>showUpd("");$("tokIn").focus();}
+function confirmUpdate(){showUpd(`<p>Fetch the latest results and rebuild the picks for every game now? It takes about a minute.</p>
+  <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="updNotify"> Also send today's picks to my phone</label>
+  <div class="row" style="margin-top:10px"><button class="btn sm" id="updGo">Update now</button><button class="linkbtn" id="updCancel">Cancel</button><span style="flex:1"></span><button class="linkbtn" id="tokForget">Forget saved token</button></div>`);
+  $("updGo").onclick=()=>startUpdate($("updNotify").checked);$("updCancel").onclick=()=>showUpd("");$("tokForget").onclick=()=>{setToken("");showUpd(`<p style="margin:0">Token removed from this browser.</p>`);};}
+const updStatus=(msg,busy=true)=>showUpd(`<p style="margin:0" role="status">${busy?'<span class="spin" aria-hidden="true"></span>':""}${msg}</p>`);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const recentRuns=async()=>((await gh(`/actions/workflows/${WORKFLOW}/runs?event=workflow_dispatch&per_page=10`)).workflow_runs||[]);
+async function startUpdate(notify=false){if(updating)return;updating=true;$("updBtn").disabled=true;
+  try{updStatus("Starting the update on GitHub…");
+    const before=new Set((await recentRuns()).map(r=>r.id));
+    await gh(`/actions/workflows/${WORKFLOW}/dispatches`,{method:"POST",body:JSON.stringify({ref:"main",inputs:{notify:String(!!notify)}})});
+    const t0=Date.now();let run=null;
+    while(Date.now()-t0<8*60e3){await sleep(5000);
+      run=(await recentRuns()).find(r=>!before.has(r.id))||null;const secs=Math.round((Date.now()-t0)/1000);
+      if(run&&run.status==="completed")break;
+      updStatus(!run||["queued","waiting","pending","requested"].includes(run.status)?`Waiting for GitHub to start the job… (${secs}s)`:`Fetching results, building picks and redeploying… (${secs}s)`);}
+    if(!run||run.status!=="completed"){const e=new Error(`It's taking longer than usual. <a href="${run?run.html_url:runsLink}" target="_blank" rel="noopener">Check the run on GitHub</a> and reload this page when it's done.`);e.html=true;throw e;}
+    updStatus("Loading the new results…");
+    const fresh=await reloadData(Date.parse(run.created_at)),ok=run.conclusion==="success";
+    showUpd(`<p style="margin:0" class="${ok&&fresh?"good":"flag"}">${fresh?"Updated with the latest results and picks.":"The job finished, but GitHub Pages is still serving the old data. Reload the page in a minute."}${notify&&ok?" Picks sent to your phone.":""}${ok?"":` Some steps failed on GitHub: <a href="${run.html_url}" target="_blank" rel="noopener">see the run</a>.`}</p>`);}
+  catch(e){if(e.auth)tokenForm(e.message);else showUpd(`<p class="flag" style="margin:0">${e.html?e.message:esc(e.message==="Failed to fetch"?"Couldn't reach GitHub. Check your connection and try again.":e.message)}</p>`);}
+  finally{updating=false;$("updBtn").disabled=false;}}
+// Pages can take a little while to serve the new deploy, so retry until the data is newer than the run
+async function reloadData(since){for(let i=0;i<12;i++){try{
+    const[d,p]=await Promise.all(["draws","picks"].map(f=>fetch(`data/${f}.json?t=${Date.now()}`,{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})));
+    if(Date.parse(d.updated)>=since-5000){DATA=d;PICKS=p;applyInfo();setSeeds(DATA.draws);setupGameUI();renderAll();return true;}}catch(e){}
+    await sleep(5000);}return false;}
 
 /* ---------- odds ---------- */
 function renderOdds(){const g=G(),pz=prizes();let h="<thead><tr><th>Division</th><th>Probability</th><th>Odds</th></tr></thead><tbody>",any=0;
@@ -218,7 +267,7 @@ function renderData(){const g=G(),D=allDraws().slice().reverse();let h=`<thead><
   for(const d of D)h+=`<tr><td>${fmtDate(d.d)}</td><td>${d.n.join("  ")}</td>${g.type==="none"?"":`<td>${d.b??"–"}</td>`}<td>${esc(d.src||"added")}</td></tr>`;
   $("drawTable").innerHTML=D.length?h+"</tbody>":`<tbody><tr><td>No draws yet for ${g.name}. Add one above or import a CSV.</td></tr></tbody>`;}
 
-function renderAll(){renderGames();renderMeta();renderGrid();renderDetail();renderOdds();renderRandom();renderValue();renderData();renderHC();btDirty=true;$("fcOut").innerHTML="";$("fcTest").textContent="Runs the generator draw by draw on history it hadn't seen yet and compares its matches with random picks.";if(current==="forecast")renderForecast();if(current==="backtest"){renderBacktest();btDirty=false;}}
+function renderAll(){renderGames();renderPicks();renderMeta();renderGrid();renderDetail();renderOdds();renderRandom();renderValue();renderData();renderHC();btDirty=true;$("fcOut").innerHTML="";$("fcTest").textContent="Runs the generator draw by draw on history it hadn't seen yet and compares its matches with random picks.";if(current==="forecast")renderForecast();if(current==="backtest"){renderBacktest();btDirty=false;}}
 
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{current=b.dataset.tab;document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected",String(x===b)));
   document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("on",p.id==="p-"+current));if(current==="backtest"&&btDirty){renderBacktest();btDirty=false;}if(current==="tickets"&&!$("tickets").innerHTML)renderTickets();if(current==="forecast"&&!$("fcOut").innerHTML)renderForecast();});
@@ -240,5 +289,6 @@ $("importBtn").onclick=()=>{const g=G(),lines=$("csvBox").value.split(/\r?\n/).m
 $("exportBtn").onclick=()=>{const g=G();$("csvBox").value=$("csvFormat").textContent+"\n"+allDraws().map(d=>[d.d,...d.n].concat(g.type==="none"?[]:[d.b??""]).join(",")).join("\n");$("csvBox").select();$("csvMsg").textContent=`All ${g.name} draws are in the box above. Copy them to save a backup.`;};
 $("resetBtn").onclick=()=>{addedCache[gid]=[];saveAdded(gid);$("csvMsg").textContent=`Removed your added ${G().name} draws. The built-in data is unchanged.`;renderAll();};
 
-setupGameUI();renderAll();renderPicks();
+$("updBtn").onclick=()=>{if(updating)return;getToken()?confirmUpdate():tokenForm();};
+setupGameUI();renderAll();
 }
