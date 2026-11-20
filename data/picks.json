@@ -1,6 +1,6 @@
 {
- "generated": "2026-11-19T14:11:28.156Z",
- "date": "2026-11-19",
+ "generated": "2026-11-20T01:57:02.466Z",
+ "date": "2026-11-20",
  "settings": {
   "window": 30,
   "halfLife": 8,
@@ -464,14 +464,14 @@
   },
   "daily": {
    "name": "Daily Lotto",
-   "date": "2026-11-19",
-   "basedOn": 2803,
+   "date": "2026-11-20",
+   "basedOn": 2804,
    "tickets": [
     {
      "t": [
-      12,
-      13,
+      9,
       15,
+      16,
       22,
       33
      ],
@@ -481,59 +481,59 @@
     {
      "t": [
       4,
-      9,
+      21,
       22,
-      29,
+      30,
       33
      ],
      "pb": null,
-     "score": 2.92
+     "score": 2.87
     },
     {
      "t": [
-      4,
+      12,
       13,
       22,
       26,
-      35
-     ],
-     "pb": null,
-     "score": 2.67
-    },
-    {
-     "t": [
-      2,
-      22,
-      25,
-      26,
       33
      ],
      "pb": null,
-     "score": 2.13
+     "score": 2.1
     },
     {
      "t": [
       4,
       15,
       22,
-      25,
-      30
+      28,
+      29
      ],
      "pb": null,
-     "score": 2.09
+     "score": 2.08
+    },
+    {
+     "t": [
+      13,
+      16,
+      21,
+      22,
+      28
+     ],
+     "pb": null,
+     "score": 2.04
     }
    ],
-   "jackpot": 450000,
+   "jackpot": 500000,
    "odds": "1 in 376 992",
    "previous": {
-    "date": "2026-11-18",
+    "date": "2026-11-19",
     "draw": {
      "n": [
-      6,
-      14,
-      25,
-      26,
-      35
+      16,
+      21,
+      22,
+      24,
+      31
      ],
      "b": null
     },
@@ -547,7 +547,7 @@
        33
       ],
       "pb": null,
-      "matches": 0,
+      "matches": 1,
       "bonus": false
      },
      {
@@ -559,31 +559,7 @@
        33
       ],
       "pb": null,
-      "matches": 0,
-      "bonus": false
-     },
-     {
-      "t": [
-       4,
-       15,
-       22,
-       23,
-       28
-      ],
-      "pb": null,
-      "matches": 0,
-      "bonus": false
-     },
-     {
-      "t": [
-       11,
-       22,
-       28,
-       30,
-       33
-      ],
-      "pb": null,
-      "matches": 0,
+      "matches": 1,
       "bonus": false
      },
      {
@@ -595,7 +571,31 @@
        35
       ],
       "pb": null,
-      "matches": 2,
+      "matches": 1,
+      "bonus": false
+     },
+     {
+      "t": [
+       2,
+       22,
+       25,
+       26,
+       33
+      ],
+      "pb": null,
+      "matches": 1,
+      "bonus": false
+     },
+     {
+      "t": [
+       4,
+       15,
+       22,
+       25,
+       30
+      ],
+      "pb": null,
+      "matches": 1,
       "bonus": false
      }
     ]
