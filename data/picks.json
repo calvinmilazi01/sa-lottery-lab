@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-22T00:45:13.477Z",
+ "generated": "2026-11-22T07:16:31.826Z",
  "date": "2026-11-22",
  "settings": {
   "window": 30,
@@ -78,7 +78,7 @@
      "score": 4.23
     }
    ],
-   "jackpot": 5500000,
+   "jackpot": 7000000,
    "odds": "1 in 20 358 520",
    "previous": {
     "date": "2026-11-21",
@@ -228,7 +228,7 @@
      "score": 4.05
     }
    ],
-   "jackpot": 4500000,
+   "jackpot": 1000000,
    "odds": "1 in 20 358 520",
    "previous": {
     "date": "2026-11-21",
@@ -378,7 +378,7 @@
      "score": 4.65
     }
    ],
-   "jackpot": 2000000,
+   "jackpot": 2500000,
    "odds": "1 in 20 358 520",
    "previous": {
     "date": "2026-11-21",
@@ -523,7 +523,7 @@
      "score": 1.8
     }
    ],
-   "jackpot": 450000,
+   "jackpot": 400000,
    "odds": "1 in 376 992",
    "previous": {
     "date": "2026-11-21",
